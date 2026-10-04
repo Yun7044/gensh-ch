@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>原神立繪猜謎</title>
+<style>
+
+/* ===== 画面切换强制补丁 ===== */
+body.state-start   #start-screen  { display: flex !important; }
+body.state-start   #game-root     { display: none !important; }
+body.state-playing #start-screen  { display: none !important; }
+body.state-playing #game-root     { display: flex !important; }
+
+  /* ===== 豎屏佈局優化 ===== */
+@media (orientation: portrait) {
+  #game-root {
+    padding: 24px 18px;
+    gap: 16px;
+  }
+  .art-card {
+    border-radius: 24px;
+    padding: 10px;
+    min-height: 42vh; /* 讓立繪在豎屏有足夠高度 */
+  }
+  .options-grid {
+    grid-template-columns: 1fr; /* 豎屏改成單列，點擊範圍更大 */
+    gap: 12px;
+  }
+  .option-btn {
+    padding: 16px 20px;
+    font-size: 16px;
+    border-radius: 16px;
+  }
+  .option-btn .label {
+    width: 36px;
+    height: 36px;
+    font-size: 17px;
+  }
+  .top-bar .title { font-size: 15px; }
+  .top-bar .score { font-size: 13px; padding: 5px 14px; }
+  .next-wrap { height: 54px; }
+  .next-btn { padding: 14px 44px; font-size: 15px; }
+}
+
+  :root {
+    --bg: #FFFBF7;
+    --card: #FFFFFF;
+    --text: #4A4A4A;
+    --text-light: #8A8A8A;
+    --pink: #FFD1DC;
+    --blue: #AEC6CF;
+    --green: #B7E4C7;
+    --lavender: #D8CEE8;
+    --yellow: #FFE8B3;
+    --shadow: 0 12px 32px rgba(174, 198, 207, 0.18);
+    --radius: 28px;
+    --radius-sm: 18px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Nunito', 'Quicksand', -apple-system, 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body.state-playing #game-root { display: flex; }
+  body.state-start #start-screen { display: flex; }
+
+  /* 畫面 1：強制橫屏 */
+  #rotate-notice {
+    position: fixed; inset: 0; background: var(--bg); z-index: 9999;
+    flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 32px;
+  }
+  #rotate-notice .icon {
+    font-size: 64px; margin-bottom: 20px;
+    animation: rotate-phone 1.8s ease-in-out infinite;
+  }
+  @keyframes rotate-phone {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+  }
+  #rotate-notice h2 { font-size: 22px; font-weight: 700; margin-bottom: 10px; }
+  #rotate-notice p { font-size: 15px; color: var(--text-light); line-height: 1.6; }
+
+  /* 畫面 2：開始遊戲 */
+  #start-screen {
+    position: fixed; inset: 0; background: var(--bg); z-index: 500;
+    flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 24px; overflow-y: auto;
+  }
+  #start-screen .icon {
+    font-size: 60px; margin-bottom: 12px;
+    animation: float 3.2s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  #start-screen h1 {
+    font-size: 24px; font-weight: 800; margin-bottom: 4px; letter-spacing: 1.5px;
+  }
+  #start-screen .subtitle {
+    font-size: 13px; color: var(--text-light); margin-bottom: 22px; line-height: 1.6;
+  }
+
+  .mode-selector {
+    display: flex; gap: 8px; background: var(--card); padding: 6px;
+    border-radius: 50px; box-shadow: 0 6px 20px rgba(174, 198, 207, 0.18);
+    margin-bottom: 20px;
+  }
+  .mode-btn {
+    border: none; background: transparent; border-radius: 50px;
+    padding: 10px 22px; font-family: inherit; font-size: 14px; font-weight: 800;
+    color: var(--text-light); cursor: pointer; transition: all 0.25s ease;
+    display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .mode-btn.active {
+    background: var(--green); color: #1e4d2e;
+    box-shadow: 0 4px 12px rgba(183, 228, 199, 0.5);
+  }
+  .mode-btn:not(.active):hover { background: #F5F2EE; color: var(--text); }
+
+  #start-screen .start-btn {
+    background: var(--green); color: #1e4d2e; border: none; border-radius: 50px;
+    padding: 15px 50px; font-size: 16px; font-weight: 800; font-family: inherit;
+    cursor: pointer; box-shadow: 0 10px 28px rgba(183, 228, 199, 0.55);
+    transition: all 0.25s ease; letter-spacing: 1.5px;
+    display: inline-flex; align-items: center; gap: 10px;
+  }
+  #start-screen .start-btn:hover {
+    transform: translateY(-3px); box-shadow: 0 16px 36px rgba(183, 228, 199, 0.75);
+  }
+  #start-screen .hint {
+    font-size: 12px; color: #B8B2AA; margin-top: 16px; letter-spacing: 0.5px;
+  }
+
+  /* 畫面 3：遊戲主體 */
+  #game-root {
+    width: 100vw; height: 100vh; flex-direction: column;
+    align-items: center; justify-content: center; padding: 16px 24px; gap: 12px;
+  }
+
+  .top-bar {
+    width: 100%; max-width: 860px; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 4px; flex-shrink: 0; gap: 12px;
+  }
+  .top-bar .title {
+    font-size: 16px; font-weight: 800; letter-spacing: 1px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .top-bar .title .dot {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--green);
+    display: inline-block; transition: background 0.3s ease;
+  }
+  .top-bar .mode-tag {
+    font-size: 11px; font-weight: 800; padding: 3px 12px; border-radius: 50px;
+    background: var(--yellow); color: #7a5c1e; letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+  }
+  .top-bar .mode-tag.silhouette { background: #E5E0EE; color: #4a3d63; }
+  .top-bar .right-group { display: flex; align-items: center; gap: 10px; }
+  .top-bar .score {
+    font-size: 14px; font-weight: 700; color: var(--text-light);
+    background: var(--card); padding: 6px 16px; border-radius: 50px;
+    box-shadow: 0 4px 12px rgba(174, 198, 207, 0.12);
+  }
+  .mute-btn {
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: var(--card); box-shadow: 0 4px 12px rgba(174, 198, 207, 0.15);
+    font-size: 16px; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; transition: all 0.2s ease; padding: 0; line-height: 1;
+  }
+  .mute-btn:hover { transform: scale(1.08); }
+  .mute-btn:active { transform: scale(0.96); }
+
+  /* 立繪卡片 */
+  .art-card {
+    width: 100%; max-width: 860px; flex: 1 1 auto; min-height: 0;
+    background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; position: relative; padding: 12px; transition: background 0.4s ease;
+  }
+  .art-card img {
+    max-width: 100%; max-height: 100%; object-fit: contain;
+    border-radius: var(--radius-sm); display: block;
+    user-select: none; -webkit-user-drag: none;
+    opacity: 0;
+    transition: opacity 0.5s ease, filter 0s; /* 👈 filter 預設無過渡 */
+  }
+  .art-card img.revealing {
+    transition: opacity 0.5s ease, filter 0.6s ease; /* 👈 只有揭曉時才開啟過渡 */
+  }
+  .art-card img.loaded { opacity: 1; }
+  .art-card img.silhouette {
+    filter: brightness(0) contrast(1.05) drop-shadow(0 8px 20px rgba(74, 74, 74, 0.12));
+  }
+  .art-card.silhouette-bg {
+    background: linear-gradient(160deg, #FFFFFF 0%, #FBF7F2 100%);
+  }
+
+  .art-card .loading-hint {
+    position: absolute; font-size: 14px; color: var(--text-light);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  /* 選項 */
+  .options-grid {
+    width: 100%; max-width: 860px; display: grid;
+    grid-template-columns: 1fr 1fr; gap: 10px; flex-shrink: 0;
+  }
+  .option-btn {
+    background: var(--card); border: 2.5px solid transparent;
+    border-radius: var(--radius-sm); padding: 14px 18px;
+    font-size: 16px; font-weight: 700; font-family: inherit; color: var(--text);
+    cursor: pointer; box-shadow: 0 6px 18px rgba(174, 198, 207, 0.12);
+    transition: all 0.22s ease; display: flex; align-items: center; gap: 12px;
+    text-align: left;
+  }
+  .option-btn .label {
+    width: 36px; height: 36px; border-radius: 12px; display: flex;
+    align-items: center; justify-content: center; font-size: 17px;
+    font-weight: 800; flex-shrink: 0;
+  }
+  .option-btn:nth-child(1) .label { background: var(--pink);     color: #a05a6c; }
+  .option-btn:nth-child(2) .label { background: var(--blue);     color: #2b5563; }
+  .option-btn:nth-child(3) .label { background: var(--green);    color: #3a6b4c; }
+  .option-btn:nth-child(4) .label { background: var(--lavender); color: #5e4a7a; }
+  .option-btn:hover:not(:disabled) {
+    transform: translateY(-2px); box-shadow: 0 10px 26px rgba(174, 198, 207, 0.28);
+  }
+  .option-btn:disabled { cursor: default; }
+  .option-btn.correct { border-color: var(--green); background: #F0FAF3; }
+  .option-btn.correct .label { background: var(--green) !important; color: #1e4d2e !important; }
+  .option-btn.wrong { border-color: #F5C6C6; background: #FFF6F6; opacity: 0.75; }
+  .option-btn.wrong .label { background: #F5C6C6 !important; color: #8a3a3a !important; }
+  .option-btn.dimmed { opacity: 0.45; }
+
+  .next-wrap {
+    width: 100%; max-width: 860px; display: flex; justify-content: center;
+    flex-shrink: 0; height: 48px; align-items: center;
+  }
+  .next-btn {
+    display: none; background: var(--blue); color: #2b5563; border: none;
+    border-radius: 50px; padding: 12px 40px; font-size: 16px; font-weight: 800;
+    font-family: inherit; cursor: pointer; box-shadow: 0 8px 22px rgba(174, 198, 207, 0.35);
+    transition: all 0.25s ease; letter-spacing: 0.5px;
+  }
+  .next-btn:hover { transform: translateY(-2px); }
+  .next-btn.show { display: inline-block; }
+
+  .feedback {
+    position: fixed; top: 24px; left: 50%;
+    transform: translateX(-50%) translateY(-80px);
+    background: var(--card); padding: 10px 28px; border-radius: 50px;
+    font-size: 15px; font-weight: 800; box-shadow: 0 10px 28px rgba(174, 198, 207, 0.3);
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 100; pointer-events: none;
+  }
+  .feedback.show { transform: translateX(-50%) translateY(0); }
+  .feedback.ok { color: #3a6b4c; background: #EDF9F1; }
+  .feedback.no { color: #a05a6c; background: #FFF0F3; }
+
+  @media (max-height: 420px) {
+    #game-root { padding: 8px 16px; gap: 8px; }
+    .art-card { border-radius: 20px; padding: 8px; }
+    .option-btn { padding: 10px 14px; font-size: 14px; border-radius: 14px; }
+    .option-btn .label { width: 30px; height: 30px; font-size: 14px; border-radius: 10px; }
+    .next-wrap { height: 40px; }
+    .next-btn { padding: 8px 30px; font-size: 14px; }
+    .top-bar .title { font-size: 13px; }
+    .top-bar .score { font-size: 12px; padding: 4px 12px; }
+    .mute-btn { width: 30px; height: 30px; font-size: 14px; }
+    #start-screen .icon { font-size: 44px; margin-bottom: 8px; }
+    #start-screen h1 { font-size: 20px; }
+    #start-screen .subtitle { margin-bottom: 14px; font-size: 12px; }
+    #start-screen .start-btn { padding: 11px 40px; font-size: 15px; }
+    .mode-selector { padding: 4px; margin-bottom: 14px; }
+    .mode-btn { padding: 8px 16px; font-size: 13px; }
+  }
+</style>
+</head>
+<body class="state-start">
+
+<div id="start-screen">
+  <div class="icon">🌏</div>
+  <h1>原神立繪猜謎</h1>
+  <p class="subtitle">你能認出幾位提瓦特的旅伴？</p>
+
+  <div class="mode-selector" id="modeSelector">
+    <button class="mode-btn active" data-mode="normal">🎨 立繪模式</button>
+    <button class="mode-btn" data-mode="silhouette">🌑 剪影模式</button>
+  </div>
+
+  <button class="start-btn" id="startBtn">▶ 開始遊戲</button>
+  <p class="hint" id="modeHint">🎵 點擊後將播放背景音樂</p>
+</div>
+
+<div id="game-root">
+  <div class="top-bar">
+    <div class="title">
+      <span class="dot" id="statusDot"></span>
+      原神立繪猜謎
+      <span class="mode-tag" id="modeTag">立繪模式</span>
+    </div>
+    <div class="right-group">
+      <button class="mute-btn" id="muteBtn" title="點擊切換下一首 / 長按開關音樂">🎵</button>
+      <div class="score" id="scoreDisplay">✨ 0 / 0</div>
+    </div>
+  </div>
+
+  <div class="art-card" id="artCard">
+    <span class="loading-hint" id="loadingHint">載入立繪中…</span>
+    <img id="artImage" alt="角色立繪">
+  </div>
+
+  <div class="options-grid" id="optionsGrid"></div>
+
+  <div class="next-wrap">
+    <button class="next-btn" id="nextBtn">下一題 →</button>
+  </div>
+</div>
+
+<div class="feedback" id="feedback"></div>
+
+<script>
+
+  /* ============================================================
+   遊戲狀態
+   ============================================================ */
+let currentCorrectIndex = -1;
+let totalCount = 0;
+let correctCount = 0;
+let answered = false;
+let currentCharacter = null;
+let gameStarted = false;
+let firstQuestionLoaded = false;
+let gameMode = 'normal';
+let charactersReady = false;
+
+const artCard      = document.getElementById('artCard');
+const artImage     = document.getElementById('artImage');
+const loadingHint  = document.getElementById('loadingHint');
+const optionsGrid  = document.getElementById('optionsGrid');
+const nextBtn      = document.getElementById('nextBtn');
+const scoreDisplay = document.getElementById('scoreDisplay');
+const feedbackEl   = document.getElementById('feedback');
+const startBtn     = document.getElementById('startBtn');
+const muteBtn      = document.getElementById('muteBtn');
+const modeSelector = document.getElementById('modeSelector');
+const modeTag      = document.getElementById('modeTag');
+const statusDot    = document.getElementById('statusDot');
+const modeHint     = document.getElementById('modeHint');
+
+/* ============================================================
+   背景音樂歌單系統
+   ------------------------------------------------------------
+   請在專案資料夾中建立 bgm/ 子資料夾，放入你的 MP3 檔案。
+   檔名可以自由命名，但必須跟下面 playlist 的 file 路徑一致。
+   ============================================================ */
+const BGM_PLAYLIST = [
+  { name: '蒙德', file: 'bgm/mondstadt.mp3' },
+  { name: '璃月', file: 'bgm/liyue.mp3' },
+  { name: '稻妻', file: 'bgm/inazuma.mp3' },
+  { name: '須彌', file: 'bgm/sumeru.mp3' },
+  { name: '楓丹', file: 'bgm/fontaine.mp3' },
+  { name: '納塔', file: 'bgm/natlan.mp3' },
+  { name: '至冬', file: 'bgm/snezhnaya.mp3' },
+];
+
+let currentTrackIndex = 0;
+let bgmMuted = false;
+
+const bgmAudio = new Audio();
+bgmAudio.volume = 0.45;
+bgmAudio.preload = 'auto';
+
+function loadTrack(index) {
+  currentTrackIndex = ((index % BGM_PLAYLIST.length) + BGM_PLAYLIST.length) % BGM_PLAYLIST.length;
+  const track = BGM_PLAYLIST[currentTrackIndex];
+  bgmAudio.src = track.file;
+  bgmAudio.load();
+  updateTrackLabel();
+}
+
+function updateTrackLabel() {
+  const track = BGM_PLAYLIST[currentTrackIndex];
+  muteBtn.title = '🎵 ' + track.name + ' · 點擊切換下一首';
+}
+
+function playCurrentTrack() {
+  if (bgmMuted) return;
+  const p = bgmAudio.play();
+  if (p && typeof p.catch === 'function') {
+    p.catch(err => console.warn('BGM 播放失敗：', err));
+  }
+}
+
+function nextTrack() {
+  loadTrack(currentTrackIndex + 1);
+  playCurrentTrack();
+}
+
+bgmAudio.addEventListener('ended', () => { nextTrack(); });
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !bgmMuted && gameStarted && bgmAudio.paused) {
+    playCurrentTrack();
+  }
+});
+
+loadTrack(0);
+
+/* ============================================================
+   角色資料來源：genshin-db Web API（動態取得，永遠最新）
+   ------------------------------------------------------------
+   API 端點：https://genshin-db-api.vercel.app/api/v5/characters
+   取得所有角色名稱：?query=names&matchCategories=true
+   取得單一角色完整資料：?query=角色名稱&dumpResults=true
+   ============================================================ */
+const GENSHIN_API_BASE = 'https://genshin-db-api.vercel.app/api/v5';
+
+/* 改成這樣 */
+const IMAGE_BASE = 'https://genshin.jmp.blue/characters/';
+const IMAGE_SUFFIX = '/portrait'; // 改用透明背景立繪
+
+/* 備用角色清單（若 API 無法連線時使用，確保遊戲不中斷）
+   資料基於 7.1 版本常見可玩角色，包含至冬地區新角色 */
+const FALLBACK_CHARACTERS = [
+  // ===== 蒙德 =====
+  { name: '旅行者',       id: 'aether' },
+  { name: '安柏',         id: 'amber' },
+  { name: '凱亞',         id: 'kaeya' },
+  { name: '麗莎',         id: 'lisa' },
+  { name: '芭芭拉',       id: 'barbara' },
+  { name: '迪盧克',       id: 'diluc' },
+  { name: '雷澤',         id: 'razor' },
+  { name: '溫迪',         id: 'venti' },
+  { name: '可莉',         id: 'klee' },
+  { name: '班尼特',       id: 'bennett' },
+  { name: '諾艾爾',       id: 'noelle' },
+  { name: '菲謝爾',       id: 'fischl' },
+  { name: '砂糖',         id: 'sucrose' },
+  { name: '莫娜',         id: 'mona' },
+  { name: '迪奧娜',       id: 'diona' },
+  { name: '阿貝多',       id: 'albedo' },
+  { name: '羅莎莉亞',     id: 'rosaria' },
+  { name: '優菈',         id: 'eula' },
+  { name: '米卡',         id: 'mika' },
+
+  // ===== 璃月 =====
+  { name: '香菱',         id: 'xiangling' },
+  { name: '行秋',         id: 'xingqiu' },
+  { name: '北斗',         id: 'beidou' },
+  { name: '凝光',         id: 'ningguang' },
+  { name: '重雲',         id: 'chongyun' },
+  { name: '魈',           id: 'xiao' },
+  { name: '鍾離',         id: 'zhongli' },
+  { name: '胡桃',         id: 'hu-tao' },
+  { name: '甘雨',         id: 'ganyu' },
+  { name: '申鶴',         id: 'shenhe' },
+  { name: '雲堇',         id: 'yun-jin' },
+  { name: '夜蘭',         id: 'yelan' },
+  { name: '白朮',         id: 'baizhu' },
+  { name: '閒雲',         id: 'xianyun' },
+  { name: '嘉明',         id: 'gaming' },
+
+  // ===== 稻妻 =====
+  { name: '神里綾華',     id: 'kamisato-ayaka' },
+  { name: '雷電將軍',     id: 'raiden-shogun' },
+  { name: '八重神子',     id: 'yae-miko' },
+  { name: '神里綾人',     id: 'ayato' },
+  { name: '楓原萬葉',     id: 'kaedehara-kazuha' },
+  { name: '宵宮',         id: 'yoimiya' },
+  { name: '珊瑚宮心海',   id: 'sangonomiya-kokomi' },
+  { name: '托馬',         id: 'thoma' },
+  { name: '早柚',         id: 'sayu' },
+  { name: '九條裟羅',     id: 'kujou-sara' },
+  { name: '荒瀧一斗',     id: 'arataki-itto' },
+  { name: '五郎',         id: 'gorou' },
+  { name: '久岐忍',       id: 'kuki-shinobu' },
+  { name: '鹿野院平藏',   id: 'shikanoin-heizou' },
+
+  // ===== 須彌 =====
+  { name: '納西妲',       id: 'nahida' },
+  { name: '流浪者',       id: 'wanderer' },
+  { name: '妮露',         id: 'nilou' },
+  { name: '賽諾',         id: 'cyno' },
+  { name: '提納里',       id: 'tighnari' },
+  { name: '柯萊',         id: 'collei' },
+  { name: '多莉',         id: 'dori' },
+  { name: '坎蒂絲',       id: 'candace' },
+  { name: '萊依拉',       id: 'layla' },
+  { name: '艾爾海森',     id: 'alhaitham' },
+  { name: '迪希雅',       id: 'dehya' },
+  { name: '米卡',         id: 'mika' },
+  { name: '卡維',         id: 'kaveh' },
+  { name: '綺良良',       id: 'kirara' },
+  { name: '林尼',         id: 'lyney' },
+
+  // ===== 楓丹 =====
+  { name: '芙寧娜',       id: 'furina_ousia' },
+  { name: '那維萊特',     id: 'neuvillette' },
+  { name: '萊歐斯利',     id: 'wriothesley' },
+  { name: '娜維婭',       id: 'navia' },
+  { name: '夏洛蒂',       id: 'charlotte' },
+  { name: '夏沃蕾',       id: 'chevreuse' },
+  { name: '克洛琳德',     id: 'clorinde' },
+  { name: '希格雯',       id: 'sigewinne' },
+  { name: '艾梅莉埃',     id: 'emilie' },
+  { name: '阿蕾奇諾',     id: 'arlecchino' },
+
+  // ===== 納塔 =====
+  { name: '瑪薇卡',       id: 'mavuika' },
+  { name: '希諾寧',       id: 'xilonen' },
+  { name: '基尼奇',       id: 'kinich' },
+  { name: '馬拉妮',       id: 'mualani' },
+  { name: '卡齊娜',       id: 'kachina' },
+  { name: '歐洛倫',       id: 'ororon' },
+  { name: '恰斯卡',       id: 'chasca' },
+  { name: '瑪拉妮',       id: 'mualani' },
+
+    // ===== 挪德卡莱 (Nod-Krai) =====
+  { name: '菈烏瑪',       id: 'lauma' },
+  { name: '菲林斯',       id: 'flins' },
+  { name: '愛諾',         id: 'aino' },
+  { name: '奈芙爾',       id: 'nefer' },
+  { name: '雅珂達',       id: 'jahoda' },
+  { name: '杜林',         id: 'durin' },
+  { name: '哥倫比婭',     id: 'columbina' },
+  { name: '法爾伽',       id: 'varka' },
+  { name: '莉奈婭',       id: 'linnea' },
+  { name: '茲白',         id: 'zibai' },
+  { name: '葉洛亞',       id: 'illuga' },
+  { name: '布倫妮',       id: 'prune' },
+
+  // ===== 至冬 =====
+  // ===== 坎瑞亚 =====
+  { name: '戴因斯雷布', id: 'dainsleif' },
+];
+
+/* 實際使用的角色池（優先使用 API 資料） */
+let CHARACTERS = [];
+
+/* 從穩定的 jsDelivr CDN 取得完整角色資料，並合併中英文名稱 */
+async function fetchAllCharacters() {
+  const CHT_URL = 'https://raw.githubusercontent.com/theBowja/genshin-db/main/src/data/ChineseTraditional/characters.json';
+  const ENG_URL = 'https://raw.githubusercontent.com/theBowja/genshin-db/main/src/data/English/characters.json';
+
+  // 同時抓取中英文資料
+  const [chtRes, engRes] = await Promise.all([
+    fetch(CHT_URL),
+    fetch(ENG_URL)
+  ]);
+
+  if (!chtRes.ok || !engRes.ok) throw new Error('CDN 載入失敗');
+
+  const chtData = await chtRes.json();
+  const engData = await engRes.json();
+
+  // 建立英文名稱對照表（以數字 ID 為鍵）
+  const engMap = {};
+  Object.values(engData).forEach(c => {
+    if (c && c.id) engMap[c.id] = c.name;
+  });
+
+  // 合併資料：中文名稱 + 轉換後的英文 ID
+  return Object.values(chtData).map(c => {
+    const engName = engMap[c.id] || c.name;
+    // 將英文名稱轉成圖片 ID（例如 "Hu Tao" -> "hu-tao"）
+    const imageId = engName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    return {
+      name: c.name,      // 中文名稱（例如：胡桃）
+      id: imageId        // 圖片 ID（例如：hu-tao）
+    };
+  });
+}
+
+/* 將角色名稱轉換成圖片 ID（小寫、空格換連字號） */
+function nameToImageId(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fff\- ]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/* 改成這樣 */
+async function initCharacters() {
+  // 直接使用内建清单，不尝试联网
+  CHARACTERS = FALLBACK_CHARACTERS.slice();
+  console.log('[原神猜谜] 使用内建清单，共 ' + CHARACTERS.length + ' 位角色');
+}
+
+/* ============================================================
+   工具函式
+   ============================================================ */
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function pickRandom(arr, n, exclude = []) {
+  const pool = arr.filter(item => !exclude.includes(item.name));
+  return shuffle(pool).slice(0, n);
+}
+
+function showFeedback(text, type) {
+  feedbackEl.textContent = text;
+  feedbackEl.className = 'feedback ' + type;
+  requestAnimationFrame(() => feedbackEl.classList.add('show'));
+  setTimeout(() => feedbackEl.classList.remove('show'), 1200);
+}
+
+/* ============================================================
+   畫面切換
+   ============================================================ */
+function updateScreen() {
+  // 不再判斷橫豎屏，只根據遊戲是否開始來切換畫面
+  document.body.className = gameStarted ? 'state-playing' : 'state-start';
+}
+
+/* ============================================================
+   音樂控制
+   ============================================================ */
+function toggleMute() {
+  bgmMuted = !bgmMuted;
+  if (bgmMuted) {
+    bgmAudio.pause();
+    muteBtn.textContent = '🔇';
+    muteBtn.title = '音樂已關閉';
+  } else {
+    playCurrentTrack();
+    muteBtn.textContent = '🎵';
+    updateTrackLabel();
+  }
+}
+
+muteBtn.addEventListener('click', () => {
+  if (bgmMuted) {
+    toggleMute();
+  } else {
+    nextTrack();
+  }
+});
+
+let longPressTimer = null;
+muteBtn.addEventListener('touchstart', () => {
+  longPressTimer = setTimeout(() => { toggleMute(); longPressTimer = null; }, 600);
+});
+muteBtn.addEventListener('touchend', () => {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+});
+muteBtn.addEventListener('mousedown', () => {
+  longPressTimer = setTimeout(() => { toggleMute(); longPressTimer = null; }, 600);
+});
+muteBtn.addEventListener('mouseup', () => {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+});
+
+/* ============================================================
+   模式選擇
+   ============================================================ */
+modeSelector.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mode-btn');
+  if (!btn) return;
+  modeSelector.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  gameMode = btn.dataset.mode;
+
+  if (gameMode === 'silhouette') {
+    modeHint.textContent = '🌑 立繪將以全黑剪影呈現，答題後揭曉';
+  } else {
+    modeHint.textContent = '🎵 點擊後將播放背景音樂';
+  }
+});
+
+function applyModeToUI() {
+  if (gameMode === 'silhouette') {
+    modeTag.textContent = '剪影模式';
+    modeTag.classList.add('silhouette');
+    statusDot.style.background = '#B9A8D4';
+  } else {
+    modeTag.textContent = '立繪模式';
+    modeTag.classList.remove('silhouette');
+    statusDot.style.background = 'var(--green)';
+  }
+}
+
+/* ============================================================
+   開始遊戲
+   ============================================================ */
+startBtn.addEventListener('click', async () => {
+  /* 若角色資料還沒載入完成，按鈕先禁用並顯示載入提示 */
+  if (!charactersReady) {
+    startBtn.textContent = '⏳ 載入角色資料…';
+    startBtn.disabled = true;
+    await initCharacters();
+    charactersReady = true;
+    startBtn.textContent = '▶ 開始遊戲';
+    startBtn.disabled = false;
+  }
+
+  gameStarted = true;
+  playCurrentTrack();
+  updateScreen();
+  applyModeToUI();
+
+  if (!firstQuestionLoaded) {
+    firstQuestionLoaded = true;
+    newQuestion();
+  }
+});
+
+/* ============================================================
+   出題
+   ============================================================ */
+/* ============================================================
+   出題去重隊列
+   ============================================================ */
+let questionQueue = [];
+
+function newQuestion() {
+  if (!CHARACTERS.length) {
+    loadingHint.textContent = '角色資料尚未載入 😢';
+    return;
+  }
+
+  // 隊列不足 5 個時重新洗牌（避免剛好剩很少導致選項重複）
+  if (questionQueue.length < 5) {
+    questionQueue = shuffle(CHARACTERS.slice());
+  }
+
+  answered = false;
+  nextBtn.classList.remove('show');
+  optionsGrid.innerHTML = '';
+
+  // 從隊列取出正確答案（保證一輪內不重複）
+  const correct = questionQueue.shift();
+  currentCharacter = correct;
+
+  const distractors = pickRandom(CHARACTERS, 3, [correct.name]);
+  const allOptions = shuffle([correct, ...distractors]);
+  currentCorrectIndex = allOptions.findIndex(c => c.name === correct.name);
+
+  loadingHint.textContent = '載入立繪中…';
+  loadingHint.style.display = 'block';
+  artImage.classList.remove('loaded');
+  artImage.classList.remove('revealing');
+
+  if (gameMode === 'silhouette') {
+    artImage.classList.add('silhouette');
+    artCard.classList.add('silhouette-bg');
+  } else {
+    artImage.classList.remove('silhouette');
+    artCard.classList.remove('silhouette-bg');
+  }
+
+  const img = new Image();
+  img.onload = () => {
+    artImage.src = img.src;
+    artImage.classList.add('loaded');
+    loadingHint.style.display = 'none';
+  };
+  img.onerror = () => {
+    loadingHint.textContent = '立繪載入失敗 😢';
+    loadingHint.style.display = 'block';
+    artImage.classList.remove('loaded');
+    artImage.removeAttribute('src');
+  };
+  img.src = 'images/' + correct.id + '.png';
+
+  const labels = ['A', 'B', 'C', 'D'];
+  allOptions.forEach((char, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.dataset.index = i;
+    btn.innerHTML = `<span class="label">${labels[i]}</span><span>${char.name}</span>`;
+    btn.addEventListener('click', () => handleAnswer(i, btn));
+    optionsGrid.appendChild(btn);
+  });
+}
+
+/* ============================================================
+   作答處理
+   ============================================================ */
+function handleAnswer(index, btn) {
+  if (answered) return;
+  answered = true;
+
+  const allBtns = [...optionsGrid.querySelectorAll('.option-btn')];
+  allBtns.forEach(b => { b.disabled = true; });
+
+  const isCorrect = index === currentCorrectIndex;
+  allBtns[currentCorrectIndex].classList.add('correct');
+
+  if (isCorrect) {
+    correctCount++;
+    showFeedback('✨ 答對了！', 'ok');
+  } else {
+    btn.classList.add('wrong');
+    allBtns.forEach((b, i) => {
+      if (i !== index && i !== currentCorrectIndex) b.classList.add('dimmed');
+    });
+    showFeedback('💭 答案是「' + currentCharacter.name + '」', 'no');
+  }
+
+  if (gameMode === 'silhouette') {
+    setTimeout(() => {
+      artImage.classList.add('revealing'); 
+      artImage.classList.remove('silhouette');
+      artCard.classList.remove('silhouette-bg');
+    }, 350);
+  }
+
+  totalCount++;
+  updateScore();
+  nextBtn.classList.add('show');
+}
+
+function updateScore() {
+  scoreDisplay.textContent = `✨ ${correctCount} / ${totalCount}`;
+}
+
+/* ============================================================
+   事件綁定
+   ============================================================ */
+nextBtn.addEventListener('click', () => { newQuestion(); });
+
+// 只需要監聽 resize，不需要 orientationchange
+window.addEventListener('resize', updateScreen);
+
+/* ============================================================
+   預先載入角色資料（背景執行，不阻塞畫面）
+   ============================================================ */
+initCharacters().then(() => {
+  charactersReady = true;
+  console.log('[原神猜謎] 角色資料已就緒');
+});
+
+updateScreen();
+</script>
+
+<!-- ============================================================
+     自動下一題補丁
+     ============================================================ -->
+<script>
+(function () {
+  const nextBtn = document.getElementById('nextBtn');
+  if (!nextBtn) return;
+
+  let autoDelay = 1000;
+  let autoTimer = null;
+
+  function clearAutoTimer() {
+    if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+  }
+
+  const observer = new MutationObserver(() => {
+    if (nextBtn.classList.contains('show')) {
+      if (autoTimer) return;
+      autoTimer = setTimeout(() => {
+        autoTimer = null;
+        nextBtn.click();
+      }, autoDelay);
+    } else {
+      clearAutoTimer();
+    }
+  });
+
+  observer.observe(nextBtn, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+
+  window.autoNext = {
+    get delay() { return autoDelay; },
+    set delay(ms) {
+      autoDelay = Math.max(0, Number(ms) || 0);
+      console.log('[自動下一題] 延遲已設為 ' + autoDelay + 'ms');
+    },
+    disable() {
+      clearAutoTimer();
+      observer.disconnect();
+      console.log('[自動下一題] 已停用');
+    },
+  };
+})();
+</script>
+
+<!-- ============================================================
+     遊戲計分模式 · 大補丁
+     貼在所有 <script> 最下面、</body> 之前
+     ============================================================ -->
+<script>
+(function () {
+
+  // ============================================================
+  // 1. 注入 CSS
+  // ============================================================
+  const style = document.createElement('style');
+  style.textContent = `
+    .rule-selector { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 400px; margin-bottom: 20px; }
+    .rule-btn { border: 2px solid transparent; background: #FFFFFF; border-radius: 16px; padding: 12px 18px; font-family: inherit; font-size: 14px; font-weight: 800; color: #8A8A8A; cursor: pointer; transition: all 0.25s ease; text-align: left; box-shadow: 0 4px 12px rgba(174, 198, 207, 0.1); }
+    .rule-btn.active { border-color: #AEC6CF; background: #EEF4FA; color: #2b5563; box-shadow: 0 6px 18px rgba(174, 198, 207, 0.35); }
+    .rule-btn:not(.active):hover { background: #F5F2EE; color: #4A4A4A; }
+    .stat-box { font-size: 14px; font-weight: 800; color: #4A4A4A; background: #FFFFFF; padding: 6px 14px; border-radius: 50px; box-shadow: 0 4px 12px rgba(174, 198, 207, 0.12); letter-spacing: 1px; white-space: nowrap; transition: all 0.3s ease; }
+    .stat-box.danger { color: #a05a6c; background: #FFF0F3; animation: statPulse 0.8s infinite; }
+    @keyframes statPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    #gameOverScreen { display: none; position: fixed; inset: 0; background: rgba(255, 251, 247, 0.96); z-index: 999; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+    #gameOverScreen.show { display: flex; }
+    #gameOverScreen .over-icon { font-size: 64px; margin-bottom: 16px; }
+    #gameOverScreen h1 { font-size: 26px; font-weight: 800; margin-bottom: 12px; color: #4A4A4A; }
+    #gameOverScreen p { font-size: 15px; color: #8A8A8A; margin-bottom: 28px; line-height: 1.8; white-space: pre-line; }
+    #gameOverScreen .restart-btn { background: #B7E4C7; color: #1e4d2e; border: none; border-radius: 50px; padding: 14px 48px; font-size: 16px; font-weight: 800; font-family: inherit; cursor: pointer; box-shadow: 0 10px 28px rgba(183, 228, 199, 0.55); transition: all 0.25s ease; letter-spacing: 1.5px; }
+    #gameOverScreen .restart-btn:hover { transform: translateY(-3px); }
+    @media (orientation: portrait) {
+      .stat-box { font-size: 12px; padding: 4px 10px; }
+      .rule-btn { font-size: 13px; padding: 10px 14px; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  // ============================================================
+  // 2. 注入 HTML
+  // ============================================================
+  // 2.1 遊戲規則選擇器（插入在開始按鈕上方）
+  const startBtnOld = document.getElementById('startBtn');
+  const ruleSelector = document.createElement('div');
+  ruleSelector.className = 'rule-selector';
+  ruleSelector.id = 'ruleSelector';
+  ruleSelector.innerHTML = `
+    <button class="rule-btn active" data-rule="baby">🐣 牛犢寶寶（無限命 / 無限時）</button>
+    <button class="rule-btn" data-rule="endurance">🛡️ 持久耐力（3命 / 9秒 / 連對3題回血）</button>
+    <button class="rule-btn" data-rule="one_life">💀 一命通關（1命 / 8秒）</button>
+    <button class="rule-btn" data-rule="god">⚡ 神人爆發（5命 / 5秒 / 15題）</button>
+  `;
+  startBtnOld.parentNode.insertBefore(ruleSelector, startBtnOld);
+
+  // 2.2 頂部生命值與計時器
+  const rightGroup = document.querySelector('.top-bar .right-group');
+  const livesDisplay = document.createElement('div');
+  livesDisplay.className = 'stat-box';
+  livesDisplay.id = 'livesDisplay';
+  livesDisplay.textContent = '❤️ ∞';
+  const timerDisplay = document.createElement('div');
+  timerDisplay.className = 'stat-box';
+  timerDisplay.id = 'timerDisplay';
+  timerDisplay.textContent = '⏱️ ∞';
+  rightGroup.insertBefore(timerDisplay, rightGroup.firstChild);
+  rightGroup.insertBefore(livesDisplay, rightGroup.firstChild);
+
+  // 2.3 遊戲結束畫面
+  const gameOverScreen = document.createElement('div');
+  gameOverScreen.id = 'gameOverScreen';
+  gameOverScreen.innerHTML = `
+    <div class="over-icon" id="overIcon">💀</div>
+    <h1 id="overTitle">遊戲結束</h1>
+    <p id="overDesc"></p>
+    <button class="restart-btn" id="restartBtn">🔄 再玩一次</button>
+  `;
+  document.body.appendChild(gameOverScreen);
+
+  // ============================================================
+  // 3. 遊戲規則與狀態
+  // ============================================================
+  const RULES = {
+    baby:      { lives: Infinity, time: Infinity, maxQ: Infinity, recover: false },
+    endurance: { lives: 3,        time: 9,        maxQ: 25,       recover: true },
+    one_life:  { lives: 1,        time: 8,        maxQ: 30,       recover: false },
+    god:       { lives: 5,        time: 5,        maxQ: 15,       recover: false },
+  };
+
+  let gameRule = 'baby';
+  let pLives = Infinity;
+  let pMaxLives = 3;
+  let pStreak = 0;
+  let pTimeLeft = 0;
+  let pTimerInterval = null;
+  let pQuestionCount = 0;
+  let pCorrectCount = 0;
+  let pAnswered = false;
+
+  // ============================================================
+  // 4. 輔助函式
+  // ============================================================
+  function updateLivesDisplay() {
+    if (pLives === Infinity) {
+      livesDisplay.textContent = '❤️ ∞';
+      livesDisplay.classList.remove('danger');
+      return;
+    }
+    let str = '';
+    for (let i = 0; i < pMaxLives; i++) str += (i < pLives ? '❤️ ' : '🖤 ');
+    livesDisplay.textContent = str.trim();
+    livesDisplay.classList.toggle('danger', pLives <= 1);
+  }
+
+  function updateTimerDisplay() {
+    if (pTimeLeft === Infinity) {
+      timerDisplay.textContent = '⏱️ ∞';
+      timerDisplay.classList.remove('danger');
+      return;
+    }
+    timerDisplay.textContent = '⏱️ ' + pTimeLeft + 's';
+    timerDisplay.classList.toggle('danger', pTimeLeft <= 2);
+  }
+
+  function startTimer() {
+    clearInterval(pTimerInterval);
+    const rule = RULES[gameRule];
+    if (rule.time === Infinity) {
+      pTimeLeft = Infinity;
+      updateTimerDisplay();
+      return;
+    }
+    pTimeLeft = rule.time;
+    updateTimerDisplay();
+    pTimerInterval = setInterval(() => {
+      pTimeLeft--;
+      updateTimerDisplay();
+      if (pTimeLeft <= 0) {
+        clearInterval(pTimerInterval);
+        if (!pAnswered) {
+          // 時間到，強制當作答錯
+          const allBtns = [...optionsGrid.querySelectorAll('.option-btn')];
+          const wrongIndex = allBtns.findIndex((b, i) => i !== currentCorrectIndex);
+          if (wrongIndex >= 0) handleAnswer(wrongIndex, allBtns[wrongIndex], true);
+        }
+      }
+    }, 1000);
+  }
+
+  function endGame(reason) {
+    clearInterval(pTimerInterval);
+    const icon = document.getElementById('overIcon');
+    const title = document.getElementById('overTitle');
+    const desc = document.getElementById('overDesc');
+    gameOverScreen.classList.add('show');
+    if (reason === 'dead') {
+      icon.textContent = '💀';
+      title.textContent = '生命耗盡！';
+      desc.textContent = `答對題數：${pCorrectCount} / ${pQuestionCount}\n下次再來挑戰吧！`;
+    } else if (reason === 'clear') {
+      icon.textContent = '🏆';
+      title.textContent = '挑戰完成！';
+      desc.textContent = `剩餘生命：${pLives} / ${pMaxLives}\n答對題數：${pCorrectCount} / ${pQuestionCount}`;
+    }
+  }
+
+  // ============================================================
+  // 5. 覆寫 newQuestion（加入題數上限檢查與計時器啟動）
+  // ============================================================
+  const _origNewQuestion = newQuestion;
+  newQuestion = function () {
+    if (RULES[gameRule].maxQ !== Infinity && pQuestionCount >= RULES[gameRule].maxQ) {
+      endGame('clear');
+      return;
+    }
+    pAnswered = false;
+    clearInterval(pTimerInterval);
+    _origNewQuestion();
+    startTimer();
+  };
+
+  // ============================================================
+  // 6. 覆寫 handleAnswer（加入生命值、連擊、計時器邏輯）
+  // ============================================================
+  handleAnswer = function (index, btn, isTimeout) {
+    if (pAnswered) return;
+    pAnswered = true;
+    clearInterval(pTimerInterval);
+
+    const allBtns = [...optionsGrid.querySelectorAll('.option-btn')];
+    allBtns.forEach(b => { b.disabled = true; });
+    allBtns[currentCorrectIndex].classList.add('correct');
+
+    const isCorrect = !isTimeout && index === currentCorrectIndex;
+
+    if (isCorrect) {
+      pCorrectCount++;
+      pStreak++;
+      showFeedback('✨ 答對了！', 'ok');
+      // 持久耐力模式：連對 3 題回血
+      if (RULES[gameRule].recover && pStreak >= 3 && pLives < pMaxLives) {
+        pLives++;
+        pStreak = 0;
+        updateLivesDisplay();
+        setTimeout(() => showFeedback('💖 連對三題，恢復一點生命！', 'ok'), 500);
+      }
+    } else {
+      if (btn) btn.classList.add('wrong');
+      allBtns.forEach((b, i) => {
+        if (i !== index && i !== currentCorrectIndex) b.classList.add('dimmed');
+      });
+      showFeedback(
+        isTimeout ? '⏰ 時間到！答案是「' + currentCharacter.name + '」'
+                  : '💭 答案是「' + currentCharacter.name + '」',
+        'no'
+      );
+      pStreak = 0;
+      if (pLives !== Infinity) {
+        pLives--;
+        updateLivesDisplay();
+      }
+    }
+
+    // 剪影模式揭曉
+    if (gameMode === 'silhouette') {
+      setTimeout(() => {
+        artImage.classList.add('revealing');
+        artImage.classList.remove('silhouette');
+        artCard.classList.remove('silhouette-bg');
+      }, 350);
+    }
+
+    pQuestionCount++;
+    scoreDisplay.textContent = `✨ ${pCorrectCount} / ${pQuestionCount}`;
+
+    // 檢查生命耗盡
+    if (pLives !== Infinity && pLives <= 0) {
+      setTimeout(() => endGame('dead'), 1000);
+      return;
+    }
+    nextBtn.classList.add('show');
+  };
+
+  // ============================================================
+  // 7. 規則選擇器監聽
+  // ============================================================
+  ruleSelector.addEventListener('click', (e) => {
+    const btn = e.target.closest('.rule-btn');
+    if (!btn) return;
+    ruleSelector.querySelectorAll('.rule-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    gameRule = btn.dataset.rule;
+  });
+
+  // ============================================================
+  // 8. 替換開始按鈕（清掉舊監聽，重新初始化）
+  // ============================================================
+  const newStartBtn = startBtnOld.cloneNode(true);
+  startBtnOld.parentNode.replaceChild(newStartBtn, startBtnOld);
+
+  newStartBtn.addEventListener('click', () => {
+    gameStarted = true;
+    if (typeof playCurrentTrack === 'function') playCurrentTrack();
+
+    const rule = RULES[gameRule];
+    pLives = rule.lives === Infinity ? Infinity : rule.lives;
+    pMaxLives = rule.lives;
+    pStreak = 0;
+    pQuestionCount = 0;
+    pCorrectCount = 0;
+    pAnswered = false;
+
+    updateLivesDisplay();
+    updateTimerDisplay();
+    scoreDisplay.textContent = '✨ 0 / 0';
+
+    updateScreen();
+    if (typeof applyModeToUI === 'function') applyModeToUI();
+
+    firstQuestionLoaded = true;
+    newQuestion();
+  });
+
+  // ============================================================
+  // 9. 再玩一次
+  // ============================================================
+  document.getElementById('restartBtn').addEventListener('click', () => {
+    gameOverScreen.classList.remove('show');
+    gameStarted = false;
+    firstQuestionLoaded = false;
+    pQuestionCount = 0;
+    pCorrectCount = 0;
+    pStreak = 0;
+    clearInterval(pTimerInterval);
+    document.body.className = 'state-start';
+    if (typeof updateScreen === 'function') updateScreen();
+    scoreDisplay.textContent = '✨ 0 / 0';
+  });
+
+  console.log('[計分模式] 大補丁已載入 ✅');
+})();
+</script>
+
+</body>
+</html>
